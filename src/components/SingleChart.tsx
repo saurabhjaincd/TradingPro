@@ -83,19 +83,19 @@ export function SingleChart({ symbol, viewMode, onViewModeChange }: SingleChartP
 
   return (
     <div className="h-full flex flex-col bg-white border-r-2 border-gray-300">
-      {/* Compact Header */}
-      <div className="px-6 py-4 border-b-2 border-gray-300 flex-shrink-0 bg-white">
+      {/* Ultra Compact Header */}
+      <div className="px-4 py-2 border-b border-gray-300 flex-shrink-0 bg-white">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-3">
-              <h2 className="text-2xl font-bold text-gray-900">{symbol}</h2>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <h2 className="text-lg font-bold text-gray-900">{symbol}</h2>
               {loading && (
-                <RefreshCw className="w-5 h-5 animate-spin text-blue-500" />
+                <RefreshCw className="w-3 h-3 animate-spin text-blue-500" />
               )}
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-2xl font-bold text-gray-900">${currentPrice.toFixed(2)}</span>
-              <div className={`flex items-center space-x-1 text-sm font-medium ${
+            <div className="flex items-center space-x-3">
+              <span className="text-lg font-bold text-gray-900">${currentPrice.toFixed(2)}</span>
+              <div className={`flex items-center space-x-1 text-xs font-medium ${
                 priceChange >= 0 ? 'text-green-600' : 'text-red-600'
               }`}>
                 <span>
@@ -105,51 +105,51 @@ export function SingleChart({ symbol, viewMode, onViewModeChange }: SingleChartP
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             <TimeframeSelector
               selectedTimeframe={selectedTimeframe}
               onTimeframeChange={setSelectedTimeframe}
             />
 
             {/* View Mode Toggle */}
-            <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-300">
+            <div className="flex bg-gray-100 rounded p-0.5 border border-gray-300">
               <button
                 onClick={() => onViewModeChange('single')}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center ${
+                className={`px-2 py-1 text-xs font-medium rounded transition-all duration-200 flex items-center ${
                   viewMode === 'single'
-                    ? 'bg-white text-gray-900 shadow-md border border-gray-200'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
                 title="Single Chart View"
               >
-                <BarChart3 className="w-4 h-4" />
+                <BarChart3 className="w-3 h-3" />
               </button>
               <button
                 onClick={() => onViewModeChange('multi')}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center ${
+                className={`px-2 py-1 text-xs font-medium rounded transition-all duration-200 flex items-center ${
                   viewMode === 'multi'
-                    ? 'bg-white text-gray-900 shadow-md border border-gray-200'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
                 title="Multi Chart View"
               >
-                <Grid3X3 className="w-4 h-4" />
+                <Grid3X3 className="w-3 h-3" />
               </button>
             </div>
             
             <button
               onClick={fetchData}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300"
+              className="p-1.5 hover:bg-gray-100 rounded transition-colors border border-gray-300"
               title="Refresh data"
             >
-              <RefreshCw className="w-4 h-4 text-gray-600" />
+              <RefreshCw className="w-3 h-3 text-gray-600" />
             </button>
           </div>
         </div>
       </div>
       
-      {/* Chart Container - Full height */}
-      <div className="flex-1 p-4 min-h-0 bg-gray-50">
+      {/* Chart Container - Maximum height */}
+      <div className="flex-1 p-3 min-h-0 bg-gray-50">
         {chartData ? (
           <Chart
             symbol={symbol}

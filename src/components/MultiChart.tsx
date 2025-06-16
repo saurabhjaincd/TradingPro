@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Chart } from './Chart';
-import { TimeframeSelector } from './TimeframeSelector';
 import { Timeframe, ChartData } from '../types/trading';
 import { fetchChartData, fetchSymbolData } from '../services/yahooFinance';
 import { RefreshCw, ChevronLeft, ChevronRight, BarChart3, Grid3X3 } from 'lucide-react';
@@ -33,17 +32,18 @@ const AVAILABLE_TIMEFRAMES: { label: string; value: Timeframe }[] = [
 ];
 
 export function MultiChart({ symbol, viewMode, onViewModeChange }: MultiChartProps) {
-  const [currentTimeframeIndex, setCurrentTimeframeIndex] = useState(0);
+  const [selectedTimeframes, setSelectedTimeframes] = useState<Timeframe[]>(['1h', '4h', '1d', '1w']);
+  const [currentChartIndex, setCurrentChartIndex] = useState(0);
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [symbolData, setSymbolData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const currentTimeframe = AVAILABLE_TIMEFRAMES[currentTimeframeIndex];
+  const currentTimeframe = selectedTimeframes[currentChartIndex];
 
   useEffect(() => {
     fetchData();
-  }, [symbol, currentTimeframeIndex]);
+  }, [symbol, currentChartIndex, selectedTimeframes]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -51,7 +51,7 @@ export function MultiChart({ symbol, viewMode, onViewModeChange }: MultiChartPro
     
     try {
       const [chartResult, symbolResult] = await Promise.all([
-        fetchChartData(symbol, currentTimeframe.value),
+        fetchChartData(symbol, currentTimeframe),
         fetchSymbolData(symbol)
       ]);
       
@@ -72,12 +72,18 @@ export function MultiChart({ symbol, viewMode, onViewModeChange }: MultiChartPro
     setLoading(false);
   };
 
-  const handlePrevTimeframe = () => {
-    setCurrentTimeframeIndex(prev => Math.max(0, prev - 1));
+  const handleTimeframeChange = (index: number, newTimeframe: Timeframe) => {
+    const updatedTimeframes = [...selectedTimeframes];
+    updatedTimeframes[index] = newTimeframe;
+    setSelectedTimeframes(updatedTimeframes);
   };
 
-  const handleNextTimeframe = () => {
-    setCurrentTimeframeIndex(prev => Math.min(AVAILABLE_TIMEFRAMES.length - 1, prev + 1));
+  const handlePrevChart = () => {
+    setCurrentChartIndex(prev => Math.max(0, prev - 1));
+  };
+
+  const handleNextChart = () => {
+    setCurrentChartIndex(prev => Math.min(3, prev + 1));
   };
 
   const currentPrice = symbolData?.price || (chartData?.candles[chartData.candles.length - 1]?.close) || 0;
@@ -114,19 +120,19 @@ export function MultiChart({ symbol, viewMode, onViewModeChange }: MultiChartPro
 
   return (
     <div className="h-full flex flex-col bg-white border-r-2 border-gray-300">
-      {/* Header */}
-      <div className="px-6 py-4 border-b-2 border-gray-300 flex-shrink-0 bg-white">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-3">
-              <h2 className="text-2xl font-bold text-gray-900">{symbol}</h2>
+      {/* Compact Header */}
+      <div className="px-4 py-2 border-b border-gray-300 flex-shrink-0 bg-white">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <h2 className="text-lg font-bold text-gray-900">{symbol}</h2>
               {loading && (
-                <RefreshCw className="w-5 h-5 animate-spin text-blue-500" />
+                <RefreshCw className="w-3 h-3 animate-spin text-blue-500" />
               )}
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-2xl font-bold text-gray-900">${currentPrice.toFixed(2)}</span>
-              <div className={`flex items-center space-x-1 text-sm font-medium ${
+            <div className="flex items-center space-x-3">
+              <span className="text-lg font-bold text-gray-900">${currentPrice.toFixed(2)}</span>
+              <div className={`flex items-center space-x-1 text-xs font-medium ${
                 priceChange >= 0 ? 'text-green-600' : 'text-red-600'
               }`}>
                 <span>
@@ -136,100 +142,102 @@ export function MultiChart({ symbol, viewMode, onViewModeChange }: MultiChartPro
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             {/* View Mode Toggle */}
-            <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-300">
+            <div className="flex bg-gray-100 rounded p-0.5 border border-gray-300">
               <button
                 onClick={() => onViewModeChange('single')}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center ${
+                className={`px-2 py-1 text-xs font-medium rounded transition-all duration-200 flex items-center ${
                   viewMode === 'single'
-                    ? 'bg-white text-gray-900 shadow-md border border-gray-200'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
                 title="Single Chart View"
               >
-                <BarChart3 className="w-4 h-4" />
+                <BarChart3 className="w-3 h-3" />
               </button>
               <button
                 onClick={() => onViewModeChange('multi')}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center ${
+                className={`px-2 py-1 text-xs font-medium rounded transition-all duration-200 flex items-center ${
                   viewMode === 'multi'
-                    ? 'bg-white text-gray-900 shadow-md border border-gray-200'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
                 title="Multi Chart View"
               >
-                <Grid3X3 className="w-4 h-4" />
+                <Grid3X3 className="w-3 h-3" />
               </button>
             </div>
 
             <button
               onClick={fetchData}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300"
+              className="p-1.5 hover:bg-gray-100 rounded transition-colors border border-gray-300"
               title="Refresh chart"
             >
-              <RefreshCw className="w-4 h-4 text-gray-600" />
+              <RefreshCw className="w-3 h-3 text-gray-600" />
             </button>
           </div>
         </div>
 
-        {/* Timeframe Navigation */}
+        {/* Timeframe Configuration Row */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={handlePrevTimeframe}
-              disabled={currentTimeframeIndex === 0}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            
-            <div className="text-center min-w-32">
-              <div className="text-xl font-bold text-gray-900">
-                {currentTimeframe.label}
-              </div>
-              <div className="text-sm text-gray-600">
-                {currentTimeframeIndex + 1} of {AVAILABLE_TIMEFRAMES.length}
-              </div>
-            </div>
-            
-            <button
-              onClick={handleNextTimeframe}
-              disabled={currentTimeframeIndex >= AVAILABLE_TIMEFRAMES.length - 1}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
+          {/* 4 Timeframe Dropdowns */}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs text-gray-600 font-medium">Charts:</span>
+            {selectedTimeframes.map((timeframe, index) => (
+              <select
+                key={index}
+                value={timeframe}
+                onChange={(e) => handleTimeframeChange(index, e.target.value as Timeframe)}
+                className={`px-2 py-1 text-xs border rounded transition-colors ${
+                  currentChartIndex === index
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                }`}
+              >
+                {AVAILABLE_TIMEFRAMES.map(tf => (
+                  <option key={tf.value} value={tf.value}>{tf.label}</option>
+                ))}
+              </select>
+            ))}
           </div>
 
-          {/* Quick Timeframe Selector */}
+          {/* Chart Navigation */}
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">Quick Select:</span>
-            <div className="flex space-x-1">
-              {[0, 4, 8, 13].map((index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentTimeframeIndex(index)}
-                  className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
-                    currentTimeframeIndex === index
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {AVAILABLE_TIMEFRAMES[index].label}
-                </button>
-              ))}
+            <button
+              onClick={handlePrevChart}
+              disabled={currentChartIndex === 0}
+              className="p-1 rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-3 h-3" />
+            </button>
+            
+            <div className="text-center min-w-16">
+              <div className="text-sm font-bold text-gray-900">
+                {AVAILABLE_TIMEFRAMES.find(tf => tf.value === currentTimeframe)?.label}
+              </div>
+              <div className="text-xs text-gray-600">
+                {currentChartIndex + 1} of 4
+              </div>
             </div>
+            
+            <button
+              onClick={handleNextChart}
+              disabled={currentChartIndex >= 3}
+              className="p-1 rounded border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight className="w-3 h-3" />
+            </button>
           </div>
         </div>
       </div>
       
-      {/* Chart Container - Full height */}
-      <div className="flex-1 p-4 min-h-0 bg-gray-50">
+      {/* Chart Container - Maximum height */}
+      <div className="flex-1 p-3 min-h-0 bg-gray-50">
         {chartData ? (
           <Chart
             symbol={symbol}
-            timeframe={currentTimeframe.value}
+            timeframe={currentTimeframe}
             candles={chartData.candles}
             rsi={chartData.rsi}
             showRSI={true}

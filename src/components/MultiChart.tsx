@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Chart } from './Chart';
+import { TimeframeSelector } from './TimeframeSelector';
 import { Timeframe, ChartData } from '../types/trading';
-import { fetchChartData } from '../services/yahooFinance';
-import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { fetchChartData, fetchSymbolData } from '../services/yahooFinance';
+import { RefreshCw, ChevronLeft, ChevronRight, BarChart3, Grid3X3 } from 'lucide-react';
 
 interface MultiChartProps {
   symbol: string;
@@ -11,6 +12,10 @@ interface MultiChartProps {
 }
 
 const AVAILABLE_TIMEFRAMES: { label: string; value: Timeframe }[] = [
+  { label: '1H', value: '1h' },
+  { label: '2H', value: '2h' },
+  { label: '3H', value: '3h' },
+  { label: '4H', value: '4h' },
   { label: '1D', value: '1d' },
   { label: '2D', value: '2d' },
   { label: '3D', value: '3d' },
@@ -28,198 +33,212 @@ const AVAILABLE_TIMEFRAMES: { label: string; value: Timeframe }[] = [
 ];
 
 export function MultiChart({ symbol, viewMode, onViewModeChange }: MultiChartProps) {
-  const [currentChartIndex, setCurrentChartIndex] = useState(0);
-  const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1d');
-  const [chartData, setChartData] = useState<Record<string, ChartData>>({});
-  const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [currentTimeframeIndex, setCurrentTimeframeIndex] = useState(0);
+  const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [symbolData, setSymbolData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Only show 4 charts at a time
-  const chartsToShow = 4;
-  const currentTimeframes = AVAILABLE_TIMEFRAMES.slice(currentChartIndex, currentChartIndex + chartsToShow);
+  const currentTimeframe = AVAILABLE_TIMEFRAMES[currentTimeframeIndex];
 
   useEffect(() => {
-    fetchAllChartData();
-  }, [symbol, currentChartIndex]);
+    fetchData();
+  }, [symbol, currentTimeframeIndex]);
 
-  const fetchAllChartData = async () => {
-    const promises = currentTimeframes.map(async (tf, index) => {
-      const key = `${tf.value}-${currentChartIndex + index}`;
-      setLoading(prev => ({ ...prev, [key]: true }));
-
-      try {
-        const data = await fetchChartData(symbol, tf.value);
-        if (data) {
-          setChartData(prev => ({ ...prev, [key]: data }));
-        }
-      } catch (error) {
-        console.error(`Error fetching data for ${tf.value}:`, error);
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const [chartResult, symbolResult] = await Promise.all([
+        fetchChartData(symbol, currentTimeframe.value),
+        fetchSymbolData(symbol)
+      ]);
+      
+      if (chartResult) {
+        setChartData(chartResult);
+      } else {
+        setError('Unable to fetch chart data. Please check the symbol and try again.');
       }
       
-      setLoading(prev => ({ ...prev, [key]: false }));
-    });
-
-    await Promise.all(promises);
+      if (symbolResult) {
+        setSymbolData(symbolResult);
+      }
+    } catch (err) {
+      setError('Failed to fetch data. Please try again.');
+      console.error('Error fetching data:', err);
+    }
+    
+    setLoading(false);
   };
 
-  const handlePrevCharts = () => {
-    setCurrentChartIndex(prev => Math.max(0, prev - chartsToShow));
+  const handlePrevTimeframe = () => {
+    setCurrentTimeframeIndex(prev => Math.max(0, prev - 1));
   };
 
-  const handleNextCharts = () => {
-    setCurrentChartIndex(prev => Math.min(AVAILABLE_TIMEFRAMES.length - chartsToShow, prev + chartsToShow));
+  const handleNextTimeframe = () => {
+    setCurrentTimeframeIndex(prev => Math.min(AVAILABLE_TIMEFRAMES.length - 1, prev + 1));
   };
 
-  const refreshData = () => {
-    fetchAllChartData();
-  };
+  const currentPrice = symbolData?.price || (chartData?.candles[chartData.candles.length - 1]?.close) || 0;
+  const previousPrice = chartData?.candles[chartData.candles.length - 2]?.close || 0;
+  const priceChange = symbolData?.change || (currentPrice - previousPrice);
+  const priceChangePercent = symbolData?.changePercent || ((priceChange / previousPrice) * 100);
+
+  if (loading && !chartData) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-2" />
+          <div className="text-gray-400">Loading chart data...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !chartData) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="text-red-400 mb-2">{error}</div>
+          <button
+            onClick={fetchData}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-white border-r-2 border-gray-300">
       {/* Header */}
-      <div className="p-3 border-b-2 border-gray-300 bg-white flex-shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">Multi-Timeframe Analysis</h2>
-            <p className="text-sm text-gray-600">Compare {symbol} across timeframes</p>
+      <div className="px-6 py-4 border-b-2 border-gray-300 flex-shrink-0 bg-white">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-3">
+              <h2 className="text-2xl font-bold text-gray-900">{symbol}</h2>
+              {loading && (
+                <RefreshCw className="w-5 h-5 animate-spin text-blue-500" />
+              )}
+            </div>
+            <div className="flex items-center space-x-4">
+              <span className="text-2xl font-bold text-gray-900">${currentPrice.toFixed(2)}</span>
+              <div className={`flex items-center space-x-1 text-sm font-medium ${
+                priceChange >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                <span>
+                  {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)} ({priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%)
+                </span>
+              </div>
+            </div>
           </div>
           
-          <div className="flex items-center space-x-3">
-            {/* Compact View Mode Toggle */}
-            <div className="flex bg-gray-100 rounded p-0.5 border border-gray-300">
+          <div className="flex items-center space-x-4">
+            {/* View Mode Toggle */}
+            <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-300">
               <button
                 onClick={() => onViewModeChange('single')}
-                className={`px-2 py-1.5 text-sm font-medium rounded transition-colors ${
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center ${
                   viewMode === 'single'
-                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                    ? 'bg-white text-gray-900 shadow-md border border-gray-200'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
                 title="Single Chart View"
               >
-                S
+                <BarChart3 className="w-4 h-4" />
               </button>
               <button
                 onClick={() => onViewModeChange('multi')}
-                className={`px-2 py-1.5 text-sm font-medium rounded transition-colors ${
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center ${
                   viewMode === 'multi'
-                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                    ? 'bg-white text-gray-900 shadow-md border border-gray-200'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
                 title="Multi Chart View"
               >
-                M
+                <Grid3X3 className="w-4 h-4" />
               </button>
             </div>
 
             <button
-              onClick={refreshData}
-              className="p-2 hover:bg-gray-100 rounded transition-colors border border-gray-300"
-              title="Refresh charts"
+              onClick={fetchData}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300"
+              title="Refresh chart"
             >
               <RefreshCw className="w-4 h-4 text-gray-600" />
             </button>
           </div>
         </div>
 
-        {/* Chart Navigation */}
+        {/* Timeframe Navigation */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-4">
             <button
-              onClick={handlePrevCharts}
-              disabled={currentChartIndex === 0}
+              onClick={handlePrevTimeframe}
+              disabled={currentTimeframeIndex === 0}
               className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-5 h-5" />
             </button>
             
-            <div className="text-center">
-              <div className="font-semibold text-gray-900">
-                Charts {currentChartIndex + 1}-{Math.min(currentChartIndex + chartsToShow, AVAILABLE_TIMEFRAMES.length)}
+            <div className="text-center min-w-32">
+              <div className="text-xl font-bold text-gray-900">
+                {currentTimeframe.label}
               </div>
               <div className="text-sm text-gray-600">
-                of {AVAILABLE_TIMEFRAMES.length} timeframes
+                {currentTimeframeIndex + 1} of {AVAILABLE_TIMEFRAMES.length}
               </div>
             </div>
             
             <button
-              onClick={handleNextCharts}
-              disabled={currentChartIndex + chartsToShow >= AVAILABLE_TIMEFRAMES.length}
+              onClick={handleNextTimeframe}
+              disabled={currentTimeframeIndex >= AVAILABLE_TIMEFRAMES.length - 1}
               className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Timeframe Dropdown */}
+          {/* Quick Timeframe Selector */}
           <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">Timeframe:</span>
-            <select
-              value={selectedTimeframe}
-              onChange={(e) => setSelectedTimeframe(e.target.value as Timeframe)}
-              className="px-3 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {AVAILABLE_TIMEFRAMES.map(tf => (
-                <option key={tf.value} value={tf.value}>{tf.label}</option>
+            <span className="text-sm text-gray-600">Quick Select:</span>
+            <div className="flex space-x-1">
+              {[0, 4, 8, 13].map((index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentTimeframeIndex(index)}
+                  className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
+                    currentTimeframeIndex === index
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {AVAILABLE_TIMEFRAMES[index].label}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
         </div>
       </div>
       
-      {/* Charts Grid - 2x2 layout */}
-      <div className="flex-1 p-3 min-h-0 bg-gray-50">
-        <div className="grid grid-cols-2 gap-3 h-full">
-          {currentTimeframes.map((timeframe, index) => {
-            const key = `${timeframe.value}-${currentChartIndex + index}`;
-            const isLoading = loading[key];
-            const data = chartData[key];
-
-            return (
-              <div key={key} className="bg-white rounded-lg border border-gray-300 shadow-sm">
-                <div className="p-2 border-b border-gray-200 bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-sm text-gray-900">{timeframe.label}</h3>
-                    {isLoading && (
-                      <RefreshCw className="w-3 h-3 animate-spin text-blue-500" />
-                    )}
-                  </div>
-                </div>
-                
-                <div className="p-2 h-full">
-                  {isLoading ? (
-                    <div className="h-full flex items-center justify-center">
-                      <div className="text-center">
-                        <RefreshCw className="w-4 h-4 animate-spin text-blue-500 mx-auto mb-1" />
-                        <div className="text-xs text-gray-600">Loading...</div>
-                      </div>
-                    </div>
-                  ) : data ? (
-                    <div className="h-full">
-                      <Chart
-                        symbol={symbol}
-                        timeframe={timeframe.value}
-                        candles={data.candles}
-                        rsi={data.rsi}
-                        showRSI={true}
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-full flex items-center justify-center">
-                      <div className="text-center text-gray-500 text-xs">
-                        <div>No data available</div>
-                        <button
-                          onClick={fetchAllChartData}
-                          className="mt-1 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {/* Chart Container - Full height */}
+      <div className="flex-1 p-4 min-h-0 bg-gray-50">
+        {chartData ? (
+          <Chart
+            symbol={symbol}
+            timeframe={currentTimeframe.value}
+            candles={chartData.candles}
+            rsi={chartData.rsi}
+            showRSI={true}
+          />
+        ) : (
+          <div className="h-full flex items-center justify-center text-gray-500 bg-white rounded-lg border-2 border-gray-300">
+            No chart data available
+          </div>
+        )}
       </div>
     </div>
   );

@@ -23,7 +23,7 @@ export interface RSIData {
   lowerBB: number;
 }
 
-export type Timeframe = '1d' | '2d' | '3d' | '4d' | '1w' | '6d' | '7d' | '2w' | '3w' | '1M' | '5w' | '6w' | '2M' | '3M';
+export type Timeframe = '1h' | '2h' | '3h' | '4h' | '1d' | '2d' | '3d' | '4d' | '1w' | '6d' | '7d' | '2w' | '3w' | '1M' | '5w' | '6w' | '2M' | '3M';
 
 export interface ChartData {
   candles: Candle[];

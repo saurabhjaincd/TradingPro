@@ -8,6 +8,10 @@ interface TimeframeSelectorProps {
 }
 
 const defaultTimeframes: { label: string; value: Timeframe }[] = [
+  { label: '1H', value: '1h' },
+  { label: '2H', value: '2h' },
+  { label: '3H', value: '3h' },
+  { label: '4H', value: '4h' },
   { label: '1D', value: '1d' },
   { label: '2D', value: '2d' },
   { label: '3D', value: '3d' },
@@ -32,10 +36,10 @@ export function TimeframeSelector({ selectedTimeframe, onTimeframeChange, classN
           <button
             key={value}
             onClick={() => onTimeframeChange(value)}
-            className={`px-2 py-1 text-xs font-medium rounded transition-colors border ${
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 border ${
               selectedTimeframe === value
-                ? 'bg-blue-500 text-white border-blue-600'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                ? 'bg-blue-600 text-white border-blue-700 shadow-md transform scale-105'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm'
             }`}
           >
             {label}

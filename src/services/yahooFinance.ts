@@ -46,7 +46,8 @@ interface YahooSearchResponse {
 function getYahooParams(timeframe: Timeframe): { interval: string; period: string; needsAggregation: boolean; aggregationFactor: number } {
   // For timeframes that Yahoo Finance supports directly
   const directSupport: Record<string, { interval: string; period: string }> = {
-    '1d': { interval: '1d', period: '2y' }, // Increased period for more historical data
+    '1h': { interval: '1h', period: '1mo' },
+    '1d': { interval: '1d', period: '2y' },
     '1w': { interval: '1wk', period: '5y' },
     '1M': { interval: '1mo', period: '10y' },
     '3M': { interval: '3mo', period: 'max' }
@@ -57,21 +58,31 @@ function getYahooParams(timeframe: Timeframe): { interval: string; period: strin
   }
 
   // For custom timeframes that need aggregation
-  if (timeframe.endsWith('d')) {
-    const days = parseInt(timeframe.replace('d', ''));
+  if (timeframe.endsWith('h') || timeframe.endsWith('H')) {
+    const hours = parseInt(timeframe.replace(/[hH]/, ''));
+    return { 
+      interval: '1h', 
+      period: `${Math.min(hours * 30, 90)}d`,
+      needsAggregation: true, 
+      aggregationFactor: hours 
+    };
+  }
+
+  if (timeframe.endsWith('d') || timeframe.endsWith('D')) {
+    const days = parseInt(timeframe.replace(/[dD]/, ''));
     return { 
       interval: '1d', 
-      period: `${Math.min(days * 300, 1000)}d`, // Increased for more data
+      period: `${Math.min(days * 300, 1000)}d`,
       needsAggregation: true, 
       aggregationFactor: days 
     };
   }
 
-  if (timeframe.endsWith('w')) {
-    const weeks = parseInt(timeframe.replace('w', ''));
+  if (timeframe.endsWith('w') || timeframe.endsWith('W')) {
+    const weeks = parseInt(timeframe.replace(/[wW]/, ''));
     return { 
       interval: '1wk', 
-      period: `${Math.min(weeks * 150, 400)}wk`, // Increased for more data
+      period: `${Math.min(weeks * 150, 400)}wk`,
       needsAggregation: true, 
       aggregationFactor: weeks 
     };
@@ -81,7 +92,7 @@ function getYahooParams(timeframe: Timeframe): { interval: string; period: strin
     const months = parseInt(timeframe.replace('M', ''));
     return { 
       interval: '1mo', 
-      period: `${Math.min(months * 80, 200)}mo`, // Increased for more data
+      period: `${Math.min(months * 80, 200)}mo`,
       needsAggregation: true, 
       aggregationFactor: months 
     };

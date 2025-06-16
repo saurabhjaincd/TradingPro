@@ -12,7 +12,7 @@ interface SingleChartProps {
 }
 
 export function SingleChart({ symbol, viewMode, onViewModeChange }: SingleChartProps) {
-  const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1d');
+  const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1h');
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [symbolData, setSymbolData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -83,18 +83,18 @@ export function SingleChart({ symbol, viewMode, onViewModeChange }: SingleChartP
 
   return (
     <div className="h-full flex flex-col bg-white border-r-2 border-gray-300">
-      {/* Compact Header with Symbol Info and Controls */}
-      <div className="px-4 py-3 border-b-2 border-gray-300 flex-shrink-0 bg-white">
+      {/* Compact Header */}
+      <div className="px-6 py-4 border-b-2 border-gray-300 flex-shrink-0 bg-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-3">
-              <h2 className="text-xl font-bold text-gray-900">{symbol}</h2>
+              <h2 className="text-2xl font-bold text-gray-900">{symbol}</h2>
               {loading && (
-                <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
+                <RefreshCw className="w-5 h-5 animate-spin text-blue-500" />
               )}
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-xl font-bold text-gray-900">${currentPrice.toFixed(2)}</span>
+              <span className="text-2xl font-bold text-gray-900">${currentPrice.toFixed(2)}</span>
               <div className={`flex items-center space-x-1 text-sm font-medium ${
                 priceChange >= 0 ? 'text-green-600' : 'text-red-600'
               }`}>
@@ -111,29 +111,29 @@ export function SingleChart({ symbol, viewMode, onViewModeChange }: SingleChartP
               onTimeframeChange={setSelectedTimeframe}
             />
 
-            {/* Compact View Mode Toggle */}
-            <div className="flex bg-gray-100 rounded p-0.5 border border-gray-300">
+            {/* View Mode Toggle */}
+            <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-300">
               <button
                 onClick={() => onViewModeChange('single')}
-                className={`px-2 py-1.5 text-sm font-medium rounded transition-colors flex items-center ${
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center ${
                   viewMode === 'single'
-                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                    ? 'bg-white text-gray-900 shadow-md border border-gray-200'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
                 title="Single Chart View"
               >
-                S
+                <BarChart3 className="w-4 h-4" />
               </button>
               <button
                 onClick={() => onViewModeChange('multi')}
-                className={`px-2 py-1.5 text-sm font-medium rounded transition-colors flex items-center ${
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 flex items-center ${
                   viewMode === 'multi'
-                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                    ? 'bg-white text-gray-900 shadow-md border border-gray-200'
                     : 'text-gray-600 hover:text-gray-800'
                 }`}
                 title="Multi Chart View"
               >
-                M
+                <Grid3X3 className="w-4 h-4" />
               </button>
             </div>
             
@@ -148,8 +148,8 @@ export function SingleChart({ symbol, viewMode, onViewModeChange }: SingleChartP
         </div>
       </div>
       
-      {/* Chart Container - Takes remaining space */}
-      <div className="flex-1 p-3 min-h-0 bg-gray-50">
+      {/* Chart Container - Full height */}
+      <div className="flex-1 p-4 min-h-0 bg-gray-50">
         {chartData ? (
           <Chart
             symbol={symbol}

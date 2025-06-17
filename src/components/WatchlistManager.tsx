@@ -72,7 +72,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
       
       setLoading(true);
       const promises = watchlists.map(async (watchlist) => {
-        const allSymbols = watchlist.sections.flatMap(section => section.symbols);
+        const allSymbols = watchlist.sections?.flatMap(section => section.symbols) || [];
         const symbolPromises = allSymbols.map(symbol => fetchSymbolData(symbol));
         const symbolResults = await Promise.all(symbolPromises);
         const validResults = symbolResults.filter((result): result is Symbol => result !== null);
@@ -175,7 +175,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
       w.id === watchlistId 
         ? { 
             ...w, 
-            sections: [...w.sections, {
+            sections: [...(w.sections || []), {
               id: Date.now().toString(),
               name: newSectionName.trim(),
               symbols: [],
@@ -198,7 +198,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
       w.id === watchlistId 
         ? { 
             ...w, 
-            sections: w.sections.map(s => 
+            sections: (w.sections || []).map(s => 
               s.id === sectionId 
                 ? { ...s, name: newName.trim() }
                 : s
@@ -214,13 +214,13 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
 
   const deleteSection = (watchlistId: string, sectionId: string) => {
     const watchlist = watchlists.find(w => w.id === watchlistId);
-    if (!watchlist || watchlist.sections.length <= 1) return;
+    if (!watchlist || !watchlist.sections || watchlist.sections.length <= 1) return;
     
     const updatedWatchlists = watchlists.map(w => 
       w.id === watchlistId 
         ? { 
             ...w, 
-            sections: w.sections.filter(s => s.id !== sectionId),
+            sections: (w.sections || []).filter(s => s.id !== sectionId),
             updatedAt: Date.now() 
           }
         : w
@@ -233,7 +233,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
       w.id === watchlistId 
         ? { 
             ...w, 
-            sections: w.sections.map(s => 
+            sections: (w.sections || []).map(s => 
               s.id === sectionId 
                 ? { ...s, expanded: !s.expanded }
                 : s
@@ -248,10 +248,10 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
   const addToSection = async (symbol: string, sectionId: string) => {
     if (!activeWatchlist) return;
     
-    const section = activeWatchlist.sections.find(s => s.id === sectionId);
+    const section = activeWatchlist.sections?.find(s => s.id === sectionId);
     if (!section || section.symbols.includes(symbol)) return;
     
-    const totalSymbols = activeWatchlist.sections.reduce((total, s) => total + s.symbols.length, 0);
+    const totalSymbols = activeWatchlist.sections?.reduce((total, s) => total + s.symbols.length, 0) || 0;
     if (totalSymbols >= 250) {
       alert('Watchlist is full (250 symbols maximum)');
       return;
@@ -261,7 +261,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
       w.id === activeWatchlistId 
         ? { 
             ...w, 
-            sections: w.sections.map(s => 
+            sections: (w.sections || []).map(s => 
               s.id === sectionId 
                 ? { ...s, symbols: [...s.symbols, symbol] }
                 : s
@@ -285,7 +285,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
       w.id === activeWatchlistId 
         ? { 
             ...w, 
-            sections: w.sections.map(s => 
+            sections: (w.sections || []).map(s => 
               s.id === sectionId 
                 ? { ...s, symbols: s.symbols.filter(sym => sym !== symbol) }
                 : s
@@ -298,7 +298,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
   };
 
   const addPopularSymbol = (symbol: string) => {
-    if (!activeWatchlist || activeWatchlist.sections.length === 0) return;
+    if (!activeWatchlist || !activeWatchlist.sections || activeWatchlist.sections.length === 0) return;
     
     // Add to the first section by default
     addToSection(symbol, activeWatchlist.sections[0].id);
@@ -372,7 +372,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
               <optgroup label="⭐ Favorites">
                 {favoriteWatchlists.map(watchlist => (
                   <option key={watchlist.id} value={watchlist.id}>
-                    {watchlist.name} ({watchlist.sections.reduce((total, s) => total + s.symbols.length, 0)})
+                    {watchlist.name} ({watchlist.sections?.reduce((total, s) => total + s.symbols.length, 0) || 0})
                   </option>
                 ))}
               </optgroup>
@@ -381,7 +381,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
               <optgroup label="📁 Watchlists">
                 {regularWatchlists.map(watchlist => (
                   <option key={watchlist.id} value={watchlist.id}>
-                    {watchlist.name} ({watchlist.sections.reduce((total, s) => total + s.symbols.length, 0)})
+                    {watchlist.name} ({watchlist.sections?.reduce((total, s) => total + s.symbols.length, 0) || 0})
                   </option>
                 ))}
               </optgroup>
@@ -668,7 +668,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
                         defaultValue=""
                       >
                         <option value="">Add to section...</option>
-                        {activeWatchlist.sections.map(section => (
+                        {(activeWatchlist.sections || []).map(section => (
                           <option key={section.id} value={section.id}>
                             {section.name} ({section.symbols.length})
                           </option>
@@ -685,7 +685,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
         {/* Symbol Count */}
         {activeWatchlist && (
           <div className="text-xs text-gray-600 text-center">
-            {activeWatchlist.sections.reduce((total, s) => total + s.symbols.length, 0)}/250 symbols
+            {activeWatchlist.sections?.reduce((total, s) => total + s.symbols.length, 0) || 0}/250 symbols
           </div>
         )}
       </div>
@@ -694,7 +694,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
       <div className="flex-1 overflow-y-auto bg-gray-50">
         {loading && (!activeWatchlistData || activeWatchlistData.symbolData.length === 0) ? (
           <div className="p-3 text-center text-gray-600 text-xs">Loading...</div>
-        ) : !activeWatchlist || activeWatchlist.sections.length === 0 ? (
+        ) : !activeWatchlist || !activeWatchlist.sections || activeWatchlist.sections.length === 0 ? (
           <div className="p-3 text-center text-gray-600 text-xs">
             <div className="mb-1">No sections</div>
             <div className="text-xs">Create a section to add symbols</div>
@@ -732,7 +732,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
                     >
                       <Edit2 className="w-2 h-2 text-gray-600" />
                     </button>
-                    {activeWatchlist.sections.length > 1 && (
+                    {activeWatchlist.sections && activeWatchlist.sections.length > 1 && (
                       <button
                         onClick={() => deleteSection(activeWatchlist.id, section.id)}
                         className="p-0.5 hover:bg-gray-300 rounded"

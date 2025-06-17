@@ -39,10 +39,19 @@ export interface CustomTimeframe {
   months?: number;
 }
 
-export interface Watchlist {
+export interface WatchlistSection {
   id: string;
   name: string;
   symbols: string[];
+  expanded: boolean;
+  createdAt: number;
+}
+
+export interface Watchlist {
+  id: string;
+  name: string;
+  sections: WatchlistSection[];
+  isFavorite: boolean;
   createdAt: number;
   updatedAt: number;
 }

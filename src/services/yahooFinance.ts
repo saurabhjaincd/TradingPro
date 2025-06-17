@@ -102,28 +102,95 @@ function getYahooParams(timeframe: Timeframe): { interval: string; period: strin
   return { interval: '1d', period: '2y', needsAggregation: false, aggregationFactor: 1 };
 }
 
-// Format symbol for Yahoo Finance (add exchange suffix for Indian stocks)
+// Enhanced symbol formatting for various asset types
 function formatSymbolForYahoo(symbol: string): string {
-  // Common Indian stock exchanges
-  const indianExchanges = ['.NS', '.BO']; // NSE and BSE
+  // Clean the symbol first
+  const cleanSymbol = symbol.trim().toUpperCase();
   
   // If it's already formatted with exchange, return as is
-  if (indianExchanges.some(exchange => symbol.includes(exchange))) {
-    return symbol;
+  if (cleanSymbol.includes('.') || cleanSymbol.includes('-') || cleanSymbol.includes('=')) {
+    return cleanSymbol;
+  }
+  
+  // Crypto mappings
+  const cryptoMappings: Record<string, string> = {
+    'BTCUSD': 'BTC-USD',
+    'BTCUSDT': 'BTC-USD', // Map USDT to USD for Yahoo Finance
+    'ETHUSD': 'ETH-USD',
+    'ETHUSDT': 'ETH-USD',
+    'ADAUSD': 'ADA-USD',
+    'ADAUSDT': 'ADA-USD',
+    'SOLUSD': 'SOL-USD',
+    'SOLUSDT': 'SOL-USD',
+    'DOTUSD': 'DOT-USD',
+    'DOTUSDT': 'DOT-USD',
+    'LINKUSD': 'LINK-USD',
+    'LINKUSDT': 'LINK-USD',
+    'MATICUSD': 'MATIC-USD',
+    'MATICUSDT': 'MATIC-USD',
+    'AVAXUSD': 'AVAX-USD',
+    'AVAXUSDT': 'AVAX-USD'
+  };
+  
+  if (cryptoMappings[cleanSymbol]) {
+    return cryptoMappings[cleanSymbol];
+  }
+  
+  // Commodity mappings
+  const commodityMappings: Record<string, string> = {
+    'GOLD': 'GC=F',
+    'SILVER': 'SI=F',
+    'CRUDE': 'CL=F',
+    'BRENT': 'BZ=F',
+    'COPPER': 'HG=F',
+    'PLATINUM': 'PL=F',
+    'PALLADIUM': 'PA=F',
+    'NATURALGAS': 'NG=F',
+    'WHEAT': 'ZW=F',
+    'CORN': 'ZC=F',
+    'SOYBEANS': 'ZS=F'
+  };
+  
+  if (commodityMappings[cleanSymbol]) {
+    return commodityMappings[cleanSymbol];
+  }
+  
+  // Index mappings
+  const indexMappings: Record<string, string> = {
+    'SPX': '^GSPC',
+    'SP500': '^GSPC',
+    'NASDAQ': '^IXIC',
+    'DOW': '^DJI',
+    'RUSSELL2000': '^RUT',
+    'VIX': '^VIX',
+    'NIFTY': '^NSEI',
+    'SENSEX': '^BSESN',
+    'BANKNIFTY': '^NSEBANK',
+    'NIFTYIT': '^CNXIT',
+    'SHANGHAI': '000001.SS',
+    'HANG_SENG': '^HSI',
+    'NIKKEI': '^N225',
+    'FTSE': '^FTSE',
+    'DAX': '^GDAXI',
+    'CAC40': '^FCHI'
+  };
+  
+  if (indexMappings[cleanSymbol]) {
+    return indexMappings[cleanSymbol];
   }
   
   // Common US symbols don't need formatting
-  const commonUSSymbols = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'SPY'];
-  if (commonUSSymbols.includes(symbol.toUpperCase())) {
-    return symbol;
+  const commonUSSymbols = ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'SPY', 'QQQ', 'MSTR', 'PLTR', 'QUBT'];
+  if (commonUSSymbols.includes(cleanSymbol)) {
+    return cleanSymbol;
   }
   
   // For Indian symbols, try NSE first
-  if (symbol.length <= 10 && !symbol.includes('.')) {
-    return `${symbol}.NS`;
+  if (cleanSymbol.length <= 10 && !cleanSymbol.includes('.')) {
+    return `${cleanSymbol}.NS`;
   }
   
-  return symbol;
+  return cleanSymbol;
 }
 
 // Aggregate candles for custom timeframes
@@ -228,13 +295,22 @@ export async function fetchChartData(symbol: string, timeframe: Timeframe): Prom
 
 export async function searchSymbols(query: string): Promise<Symbol[]> {
   try {
+    // First try direct symbol lookup with our enhanced formatting
+    const formattedSymbol = formatSymbolForYahoo(query);
+    const directResult = await fetchSymbolData(query);
+    
+    if (directResult) {
+      return [directResult];
+    }
+    
+    // Then try Yahoo Finance search
     const url = `${CORS_PROXY}${encodeURIComponent(`${YAHOO_SEARCH_BASE}?q=${encodeURIComponent(query)}`)}`;
     
     const response = await axios.get<YahooSearchResponse>(url);
     const quotes = response.data.quotes || [];
     
     return quotes
-      .filter(quote => quote.typeDisp === 'Equity' || quote.typeDisp === 'ETF')
+      .filter(quote => quote.typeDisp === 'Equity' || quote.typeDisp === 'ETF' || quote.typeDisp === 'Index')
       .slice(0, 10) // Limit to 10 results
       .map(quote => ({
         symbol: quote.symbol,
@@ -384,8 +460,11 @@ function calculateRSIData(candles: Candle[]): RSIData[] {
   }));
 }
 
-// Popular Indian and US symbols for quick access
+// Enhanced popular symbols with more asset types
 export const POPULAR_SYMBOLS = {
-  US: ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'SPY', 'QQQ', 'BTC-USD', 'ETH-USD'],
-  INDIAN: ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'HINDUNILVR.NS', 'ITC.NS', 'SBIN.NS', 'BHARTIARTL.NS', 'KOTAKBANK.NS', 'LT.NS']
+  US: ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'MSTR', 'PLTR', 'QUBT', 'SPY', 'QQQ'],
+  INDIAN: ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'HINDUNILVR.NS', 'ITC.NS', 'SBIN.NS', 'BHARTIARTL.NS', 'KOTAKBANK.NS', 'LT.NS'],
+  CRYPTO: ['BTC-USD', 'ETH-USD', 'ADA-USD', 'SOL-USD', 'DOT-USD', 'LINK-USD', 'MATIC-USD', 'AVAX-USD'],
+  COMMODITIES: ['GC=F', 'SI=F', 'CL=F', 'BZ=F', 'HG=F', 'PL=F', 'PA=F', 'NG=F'],
+  INDICES: ['^GSPC', '^IXIC', '^DJI', '^RUT', '^VIX', '^NSEI', '^BSESN', '^HSI', '^N225', '^FTSE', '^GDAXI', '^FCHI']
 };

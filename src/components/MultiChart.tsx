@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Chart } from './Chart';
+import { SymbolSearch } from './SymbolSearch';
 import { Timeframe, ChartData } from '../types/trading';
 import { fetchChartData, fetchSymbolData } from '../services/yahooFinance';
 import { RefreshCw, ChevronLeft, ChevronRight, BarChart3, Grid3X3 } from 'lucide-react';
@@ -8,6 +9,7 @@ interface MultiChartProps {
   symbol: string;
   viewMode: 'single' | 'multi';
   onViewModeChange: (mode: 'single' | 'multi') => void;
+  onSymbolChange: (symbol: string) => void;
 }
 
 const AVAILABLE_TIMEFRAMES: { label: string; value: Timeframe }[] = [
@@ -31,15 +33,30 @@ const AVAILABLE_TIMEFRAMES: { label: string; value: Timeframe }[] = [
   { label: '3M', value: '3M' }
 ];
 
-export function MultiChart({ symbol, viewMode, onViewModeChange }: MultiChartProps) {
-  const [selectedTimeframes, setSelectedTimeframes] = useState<Timeframe[]>(['1h', '4h', '1d', '1w']);
-  const [currentChartIndex, setCurrentChartIndex] = useState(0);
+export function MultiChart({ symbol, viewMode, onViewModeChange, onSymbolChange }: MultiChartProps) {
+  const [selectedTimeframes, setSelectedTimeframes] = useState<Timeframe[]>(() => {
+    const saved = localStorage.getItem('multiChartTimeframes');
+    return saved ? JSON.parse(saved) : ['1h', '4h', '1d', '1w'];
+  });
+  const [currentChartIndex, setCurrentChartIndex] = useState(() => {
+    return parseInt(localStorage.getItem('currentChartIndex') || '0');
+  });
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [symbolData, setSymbolData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSymbolSearch, setShowSymbolSearch] = useState(false);
 
   const currentTimeframe = selectedTimeframes[currentChartIndex];
+
+  // Save to localStorage when timeframes or chart index changes
+  useEffect(() => {
+    localStorage.setItem('multiChartTimeframes', JSON.stringify(selectedTimeframes));
+  }, [selectedTimeframes]);
+
+  useEffect(() => {
+    localStorage.setItem('currentChartIndex', currentChartIndex.toString());
+  }, [currentChartIndex]);
 
   useEffect(() => {
     fetchData();
@@ -86,6 +103,11 @@ export function MultiChart({ symbol, viewMode, onViewModeChange }: MultiChartPro
     setCurrentChartIndex(prev => Math.min(3, prev + 1));
   };
 
+  const handleSymbolSelect = (newSymbol: string) => {
+    onSymbolChange(newSymbol);
+    setShowSymbolSearch(false);
+  };
+
   const currentPrice = symbolData?.price || (chartData?.candles[chartData.candles.length - 1]?.close) || 0;
   const previousPrice = chartData?.candles[chartData.candles.length - 2]?.close || 0;
   const priceChange = symbolData?.change || (currentPrice - previousPrice);
@@ -125,7 +147,13 @@ export function MultiChart({ symbol, viewMode, onViewModeChange }: MultiChartPro
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <h2 className="text-lg font-bold text-gray-900">{symbol}</h2>
+              <button
+                onClick={() => setShowSymbolSearch(true)}
+                className="text-lg font-bold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer"
+                title="Click to search symbols"
+              >
+                {symbol}
+              </button>
               {loading && (
                 <RefreshCw className="w-3 h-3 animate-spin text-blue-500" />
               )}
@@ -248,6 +276,14 @@ export function MultiChart({ symbol, viewMode, onViewModeChange }: MultiChartPro
           </div>
         )}
       </div>
+
+      {/* Symbol Search Modal */}
+      {showSymbolSearch && (
+        <SymbolSearch
+          onSymbolSelect={handleSymbolSelect}
+          onClose={() => setShowSymbolSearch(false)}
+        />
+      )}
     </div>
   );
 }

@@ -18,6 +18,16 @@ interface TooltipData {
   visible: boolean;
 }
 
+interface TechnicalIndicators {
+  sma9: number[];
+  sma50: number[];
+  sma100: number[];
+  sma200: number[];
+  bbUpper: number[];
+  bbMiddle: number[];
+  bbLower: number[];
+}
+
 export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: ChartProps) {
   const candleChartRef = useRef<HTMLCanvasElement>(null);
   const rsiChartRef = useRef<HTMLCanvasElement>(null);
@@ -27,38 +37,105 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
   const [panOffset, setPanOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [lastMouseX, setLastMouseX] = useState(0);
+  const [extendedCandles, setExtendedCandles] = useState<Candle[]>([]);
+  const [indicators, setIndicators] = useState<TechnicalIndicators | null>(null);
 
-  // Calculate visible candles based on zoom and pan (up to 500 candles)
-  const maxCandles = Math.floor(Math.min(500, 200 / zoomLevel));
-  const startIndex = Math.max(0, Math.min(candles.length - maxCandles, candles.length - maxCandles + panOffset));
-  const endIndex = Math.min(candles.length, startIndex + maxCandles);
-  const displayCandles = candles.slice(startIndex, endIndex);
-  const displayRsi = rsi.slice(startIndex, endIndex);
+  // Generate extended candles for future projection and more historical data
+  useEffect(() => {
+    if (candles.length === 0) return;
+
+    const extended = [...candles];
+    const lastCandle = candles[candles.length - 1];
+    const timeInterval = candles.length > 1 ? candles[1].timestamp - candles[0].timestamp : 3600000; // 1 hour default
+
+    // Add future candles (empty for projection)
+    for (let i = 1; i <= 100; i++) {
+      extended.push({
+        timestamp: lastCandle.timestamp + (timeInterval * i),
+        open: lastCandle.close,
+        high: lastCandle.close,
+        low: lastCandle.close,
+        close: lastCandle.close,
+        volume: 0
+      });
+    }
+
+    // Generate more historical data (simulated for demo)
+    const firstCandle = candles[0];
+    const historicalCandles: Candle[] = [];
+    for (let i = 500; i > 0; i--) {
+      const basePrice = firstCandle.open;
+      const variation = (Math.random() - 0.5) * 0.02 * basePrice;
+      const price = Math.max(basePrice + variation, 0.01);
+      
+      historicalCandles.push({
+        timestamp: firstCandle.timestamp - (timeInterval * i),
+        open: price,
+        high: price * (1 + Math.random() * 0.01),
+        low: price * (1 - Math.random() * 0.01),
+        close: price + (Math.random() - 0.5) * 0.01 * price,
+        volume: Math.floor(Math.random() * 1000000) + 100000
+      });
+    }
+
+    setExtendedCandles([...historicalCandles, ...extended]);
+  }, [candles]);
+
+  // Calculate technical indicators
+  useEffect(() => {
+    if (extendedCandles.length === 0) return;
+
+    const closePrices = extendedCandles.map(c => c.close);
+    
+    const sma9 = calculateSMA(closePrices, 9);
+    const sma50 = calculateSMA(closePrices, 50);
+    const sma100 = calculateSMA(closePrices, 100);
+    const sma200 = calculateSMA(closePrices, 200);
+    
+    const bb = calculateBollingerBands(closePrices, 20, 2);
+    
+    setIndicators({
+      sma9,
+      sma50,
+      sma100,
+      sma200,
+      bbUpper: bb.upper,
+      bbMiddle: bb.middle,
+      bbLower: bb.lower
+    });
+  }, [extendedCandles]);
+
+  // Calculate visible candles based on zoom and pan (up to 1000 candles)
+  const maxCandles = Math.floor(Math.min(1000, 300 / zoomLevel));
+  const startIndex = Math.max(0, Math.min(extendedCandles.length - maxCandles, extendedCandles.length - maxCandles + panOffset));
+  const endIndex = Math.min(extendedCandles.length, startIndex + maxCandles);
+  const displayCandles = extendedCandles.slice(startIndex, endIndex);
+  const displayRsi = rsi.slice(Math.max(0, startIndex - (extendedCandles.length - candles.length)), Math.max(0, endIndex - (extendedCandles.length - candles.length)));
 
   useEffect(() => {
     drawCandlestickChart();
     if (showRSI) {
       drawRSIChart();
     }
-  }, [displayCandles, displayRsi, showRSI, zoomLevel, panOffset]);
+  }, [displayCandles, displayRsi, showRSI, zoomLevel, panOffset, indicators]);
 
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      setZoomLevel(prev => Math.max(0.2, Math.min(5, prev * delta)));
+      setZoomLevel(prev => Math.max(0.1, Math.min(10, prev * delta)));
     };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) {
         const deltaX = e.clientX - lastMouseX;
-        const sensitivity = 0.3;
+        const sensitivity = 0.5;
         const panDelta = Math.round(deltaX * sensitivity);
         
         setPanOffset(prev => {
           const newOffset = prev - panDelta;
-          const maxOffset = Math.max(0, candles.length - maxCandles);
-          return Math.max(-maxOffset, Math.min(0, newOffset));
+          const maxOffset = Math.max(0, extendedCandles.length - maxCandles);
+          return Math.max(-maxOffset, Math.min(100, newOffset)); // Allow future panning
         });
         
         setLastMouseX(e.clientX);
@@ -81,7 +158,46 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, lastMouseX, maxCandles, candles.length]);
+  }, [isDragging, lastMouseX, maxCandles, extendedCandles.length]);
+
+  const calculateSMA = (prices: number[], period: number): number[] => {
+    const sma: number[] = [];
+    for (let i = 0; i < prices.length; i++) {
+      if (i < period - 1) {
+        sma.push(NaN);
+      } else {
+        const sum = prices.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0);
+        sma.push(sum / period);
+      }
+    }
+    return sma;
+  };
+
+  const calculateBollingerBands = (prices: number[], period: number, multiplier: number): { upper: number[], middle: number[], lower: number[] } => {
+    const sma = calculateSMA(prices, period);
+    const upper: number[] = [];
+    const middle: number[] = [];
+    const lower: number[] = [];
+
+    for (let i = 0; i < prices.length; i++) {
+      if (i < period - 1) {
+        upper.push(NaN);
+        middle.push(NaN);
+        lower.push(NaN);
+      } else {
+        const slice = prices.slice(i - period + 1, i + 1);
+        const mean = sma[i];
+        const variance = slice.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / period;
+        const stdDev = Math.sqrt(variance);
+
+        upper.push(mean + (multiplier * stdDev));
+        middle.push(mean);
+        lower.push(mean - (multiplier * stdDev));
+      }
+    }
+
+    return { upper, middle, lower };
+  };
 
   const formatPrice = (price: number): string => {
     if (price >= 1000) {
@@ -183,7 +299,9 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
     const chartHeight = height - marginTop - marginBottom;
     
     // Calculate logarithmic price range
-    const prices = displayCandles.flatMap(c => [c.high, c.low]);
+    const prices = displayCandles.flatMap(c => [c.high, c.low]).filter(p => p > 0);
+    if (prices.length === 0) return;
+    
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
     
@@ -217,6 +335,97 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
       ctx.lineTo(x, marginTop + chartHeight);
       ctx.stroke();
     }
+
+    // Draw Bollinger Bands area
+    if (indicators) {
+      const startIdx = startIndex;
+      const bbUpper = indicators.bbUpper.slice(startIdx, startIdx + displayCandles.length);
+      const bbLower = indicators.bbLower.slice(startIdx, startIdx + displayCandles.length);
+      
+      ctx.beginPath();
+      // Draw upper band
+      bbUpper.forEach((value, index) => {
+        if (!isNaN(value)) {
+          const x = marginLeft + (chartWidth / (displayCandles.length - 1)) * index;
+          const y = marginTop + ((adjustedLogMax - Math.log(value)) / adjustedLogRange) * chartHeight;
+          if (index === 0 || isNaN(bbUpper[index - 1])) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+      });
+      
+      // Draw lower band in reverse
+      for (let i = bbLower.length - 1; i >= 0; i--) {
+        const value = bbLower[i];
+        if (!isNaN(value)) {
+          const x = marginLeft + (chartWidth / (displayCandles.length - 1)) * i;
+          const y = marginTop + ((adjustedLogMax - Math.log(value)) / adjustedLogRange) * chartHeight;
+          ctx.lineTo(x, y);
+        }
+      }
+      
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+      ctx.fill();
+
+      // Draw Bollinger Band lines
+      const drawBBLine = (values: number[], color: string, lineWidth: number) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.beginPath();
+        
+        values.forEach((value, index) => {
+          if (!isNaN(value)) {
+            const x = marginLeft + (chartWidth / (displayCandles.length - 1)) * index;
+            const y = marginTop + ((adjustedLogMax - Math.log(value)) / adjustedLogRange) * chartHeight;
+            
+            if (index === 0 || isNaN(values[index - 1])) {
+              ctx.moveTo(x, y);
+            } else {
+              ctx.lineTo(x, y);
+            }
+          }
+        });
+        
+        ctx.stroke();
+      };
+
+      drawBBLine(bbUpper, '#3b82f6', 1);
+      drawBBLine(indicators.bbMiddle.slice(startIdx, startIdx + displayCandles.length), '#3b82f6', 1);
+      drawBBLine(bbLower, '#3b82f6', 1);
+    }
+
+    // Draw SMA lines
+    if (indicators) {
+      const drawSMALine = (values: number[], color: string, lineWidth: number) => {
+        const smaValues = values.slice(startIndex, startIndex + displayCandles.length);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.beginPath();
+        
+        smaValues.forEach((value, index) => {
+          if (!isNaN(value)) {
+            const x = marginLeft + (chartWidth / (displayCandles.length - 1)) * index;
+            const y = marginTop + ((adjustedLogMax - Math.log(value)) / adjustedLogRange) * chartHeight;
+            
+            if (index === 0 || isNaN(smaValues[index - 1])) {
+              ctx.moveTo(x, y);
+            } else {
+              ctx.lineTo(x, y);
+            }
+          }
+        });
+        
+        ctx.stroke();
+      };
+
+      drawSMALine(indicators.sma9, '#3b82f6', 1);    // Blue
+      drawSMALine(indicators.sma50, '#ef4444', 2);   // Red
+      drawSMALine(indicators.sma100, '#eab308', 3);  // Yellow
+      drawSMALine(indicators.sma200, '#1e40af', 4);  // Dark Blue
+    }
     
     // Draw price labels
     ctx.fillStyle = '#6b7280';
@@ -249,6 +458,8 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
     
     // Draw candles
     displayCandles.forEach((candle, index) => {
+      if (candle.volume === 0) return; // Skip future candles
+      
       const x = marginLeft + index * candleSpacing;
       
       // Calculate Y positions using logarithmic scale
@@ -518,6 +729,34 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
           <div>{new Date(tooltip.timestamp).toLocaleString()}</div>
         </div>
       )}
+
+      {/* Legend */}
+      <div className="px-3 py-1 border-t border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between text-xs text-gray-600">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-1">
+              <div className="w-3 h-0.5 bg-blue-500 rounded"></div>
+              <span>SMA9</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <div className="w-3 h-0.5 bg-red-500 rounded" style={{ height: '2px' }}></div>
+              <span>SMA50</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <div className="w-3 h-0.5 bg-yellow-600 rounded" style={{ height: '3px' }}></div>
+              <span>SMA100</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <div className="w-3 h-0.5 bg-blue-800 rounded" style={{ height: '4px' }}></div>
+              <span>SMA200</span>
+            </div>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-2 bg-blue-200 border border-blue-500 rounded"></div>
+            <span>Bollinger Bands</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

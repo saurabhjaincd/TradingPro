@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Chart } from './Chart';
 import { TimeframeSelector } from './TimeframeSelector';
+import { SymbolSearch } from './SymbolSearch';
 import { Timeframe, ChartData } from '../types/trading';
 import { fetchChartData, fetchSymbolData } from '../services/yahooFinance';
 import { RefreshCw, BarChart3, Grid3X3 } from 'lucide-react';
@@ -9,14 +10,23 @@ interface SingleChartProps {
   symbol: string;
   viewMode: 'single' | 'multi';
   onViewModeChange: (mode: 'single' | 'multi') => void;
+  onSymbolChange: (symbol: string) => void;
 }
 
-export function SingleChart({ symbol, viewMode, onViewModeChange }: SingleChartProps) {
-  const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1h');
+export function SingleChart({ symbol, viewMode, onViewModeChange, onSymbolChange }: SingleChartProps) {
+  const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>(() => {
+    return (localStorage.getItem('selectedTimeframe') as Timeframe) || '1h';
+  });
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [symbolData, setSymbolData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSymbolSearch, setShowSymbolSearch] = useState(false);
+
+  // Save timeframe to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('selectedTimeframe', selectedTimeframe);
+  }, [selectedTimeframe]);
 
   useEffect(() => {
     fetchData();
@@ -47,6 +57,11 @@ export function SingleChart({ symbol, viewMode, onViewModeChange }: SingleChartP
     }
     
     setLoading(false);
+  };
+
+  const handleSymbolSelect = (newSymbol: string) => {
+    onSymbolChange(newSymbol);
+    setShowSymbolSearch(false);
   };
 
   const currentPrice = symbolData?.price || (chartData?.candles[chartData.candles.length - 1]?.close) || 0;
@@ -88,7 +103,13 @@ export function SingleChart({ symbol, viewMode, onViewModeChange }: SingleChartP
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <h2 className="text-lg font-bold text-gray-900">{symbol}</h2>
+              <button
+                onClick={() => setShowSymbolSearch(true)}
+                className="text-lg font-bold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer"
+                title="Click to search symbols"
+              >
+                {symbol}
+              </button>
               {loading && (
                 <RefreshCw className="w-3 h-3 animate-spin text-blue-500" />
               )}
@@ -164,6 +185,14 @@ export function SingleChart({ symbol, viewMode, onViewModeChange }: SingleChartP
           </div>
         )}
       </div>
+
+      {/* Symbol Search Modal */}
+      {showSymbolSearch && (
+        <SymbolSearch
+          onSymbolSelect={handleSymbolSelect}
+          onClose={() => setShowSymbolSearch(false)}
+        />
+      )}
     </div>
   );
 }

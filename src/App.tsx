@@ -8,9 +8,23 @@ import { Watchlist } from './types/trading';
 type ViewMode = 'single' | 'multi';
 
 function App() {
-  const [selectedSymbol, setSelectedSymbol] = useState('AAPL');
+  const [selectedSymbol, setSelectedSymbol] = useState(() => {
+    return localStorage.getItem('selectedSymbol') || 'AAPL';
+  });
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('single');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return (localStorage.getItem('viewMode') as ViewMode) || 'single';
+  });
+
+  // Save selected symbol to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('selectedSymbol', selectedSymbol);
+  }, [selectedSymbol]);
+
+  // Save view mode to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('viewMode', viewMode);
+  }, [viewMode]);
 
   // Load watchlists from localStorage on mount
   useEffect(() => {
@@ -41,12 +55,14 @@ function App() {
             symbol={selectedSymbol} 
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            onSymbolChange={setSelectedSymbol}
           />
         ) : (
           <MultiChart 
             symbol={selectedSymbol} 
             viewMode={viewMode}
             onViewModeChange={setViewMode}
+            onSymbolChange={setSelectedSymbol}
           />
         )}
       </div>

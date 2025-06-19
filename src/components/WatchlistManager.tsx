@@ -11,7 +11,9 @@ interface WatchlistManagerProps {
 }
 
 export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, onWatchlistsUpdate }: WatchlistManagerProps) {
-  const [activeWatchlistId, setActiveWatchlistId] = useState<string>('');
+  const [activeWatchlistId, setActiveWatchlistId] = useState<string>(() => {
+    return localStorage.getItem('activeWatchlistId') || '';
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [searchResults, setSearchResults] = useState<Symbol[]>([]);
@@ -28,6 +30,14 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
   const [newSectionName, setNewSectionName] = useState('');
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editSectionName, setEditSectionName] = useState('');
+  const [flashingSymbols, setFlashingSymbols] = useState<Set<string>>(new Set());
+
+  // Save active watchlist to localStorage when it changes
+  useEffect(() => {
+    if (activeWatchlistId) {
+      localStorage.setItem('activeWatchlistId', activeWatchlistId);
+    }
+  }, [activeWatchlistId]);
 
   // Initialize with default watchlist if none exist
   useEffect(() => {
@@ -58,14 +68,17 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
       onWatchlistsUpdate([defaultWatchlist]);
       setActiveWatchlistId('default');
     } else if (!activeWatchlistId && watchlists.length > 0) {
-      setActiveWatchlistId(watchlists[0].id);
+      // Load saved active watchlist or default to first one
+      const savedActiveId = localStorage.getItem('activeWatchlistId');
+      const validWatchlist = watchlists.find(w => w.id === savedActiveId);
+      setActiveWatchlistId(validWatchlist ? savedActiveId! : watchlists[0].id);
     }
   }, [watchlists, activeWatchlistId, onWatchlistsUpdate]);
 
   const activeWatchlist = watchlists.find(w => w.id === activeWatchlistId);
   const activeWatchlistData = watchlistsData.find(wd => wd.watchlist.id === activeWatchlistId);
 
-  // Fetch watchlist data
+  // Fetch watchlist data with flash animation
   useEffect(() => {
     const fetchWatchlistsData = async () => {
       if (watchlists.length === 0) return;
@@ -80,14 +93,32 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
       });
       
       const results = await Promise.all(promises);
+      
+      // Check for price changes and trigger flash animation
+      const newFlashingSymbols = new Set<string>();
+      results.forEach(result => {
+        result.symbolData.forEach(newSymbol => {
+          const oldData = watchlistsData.find(wd => wd.watchlist.id === result.watchlist.id);
+          const oldSymbol = oldData?.symbolData.find(s => s.symbol === newSymbol.symbol);
+          if (oldSymbol && oldSymbol.price !== newSymbol.price) {
+            newFlashingSymbols.add(newSymbol.symbol);
+          }
+        });
+      });
+      
+      if (newFlashingSymbols.size > 0) {
+        setFlashingSymbols(newFlashingSymbols);
+        setTimeout(() => setFlashingSymbols(new Set()), 1000); // Clear flash after 1 second
+      }
+      
       setWatchlistsData(results);
       setLoading(false);
     };
 
     fetchWatchlistsData();
     
-    // Set up auto-refresh every 30 seconds
-    const interval = setInterval(fetchWatchlistsData, 30000);
+    // Set up auto-refresh every 1 minute
+    const interval = setInterval(fetchWatchlistsData, 60000);
     return () => clearInterval(interval);
   }, [watchlists]);
 
@@ -306,13 +337,14 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
 
   const renderSymbolItem = (symbol: Symbol, sectionId: string) => {
     const changePercent = isNaN(symbol.changePercent) ? 0 : symbol.changePercent;
+    const isFlashing = flashingSymbols.has(symbol.symbol);
     
     return (
       <div
         key={symbol.symbol}
-        className={`group p-2 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors ${
+        className={`group p-2 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-all duration-300 ${
           selectedSymbol === symbol.symbol ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-        }`}
+        } ${isFlashing ? 'bg-yellow-100 animate-pulse' : ''}`}
         onClick={() => onSymbolSelect(symbol.symbol)}
       >
         <div className="flex items-center justify-between">
@@ -334,7 +366,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
               <div className={`text-xs font-medium ${
                 changePercent >= 0 ? 'text-green-600' : 'text-red-600'
               }`}>
-                {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(1)}%
+                {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%
               </div>
             </div>
           </div>
@@ -784,7 +816,7 @@ export function WatchlistManager({ selectedSymbol, onSymbolSelect, watchlists, o
 
       <div className="p-2 border-t-2 border-gray-300 bg-gray-50">
         <div className="text-xs text-gray-600 text-center">
-          Auto-refresh: 30s
+          Auto-refresh: 1min
         </div>
       </div>
     </div>

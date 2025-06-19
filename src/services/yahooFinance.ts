@@ -136,6 +136,40 @@ function formatSymbolForYahoo(symbol: string): string {
     return cryptoMappings[cleanSymbol];
   }
   
+  // Currency pairs mappings
+  const currencyMappings: Record<string, string> = {
+    'USDEUR': 'USDEUR=X',
+    'USDJPY': 'USDJPY=X',
+    'GBPJPY': 'GBPJPY=X',
+    'EURUSD': 'EURUSD=X',
+    'GBPUSD': 'GBPUSD=X',
+    'USDCAD': 'USDCAD=X',
+    'AUDUSD': 'AUDUSD=X',
+    'NZDUSD': 'NZDUSD=X',
+    'USDCHF': 'USDCHF=X',
+    'EURJPY': 'EURJPY=X',
+    'EURGBP': 'EURGBP=X',
+    'AUDCAD': 'AUDCAD=X',
+    'CADJPY': 'CADJPY=X',
+    'CHFJPY': 'CHFJPY=X',
+    'EURCHF': 'EURCHF=X',
+    'EURAUD': 'EURAUD=X',
+    'EURNZD': 'EURNZD=X',
+    'GBPCHF': 'GBPCHF=X',
+    'GBPCAD': 'GBPCAD=X',
+    'GBPAUD': 'GBPAUD=X',
+    'AUDCHF': 'AUDCHF=X',
+    'AUDJPY': 'AUDJPY=X',
+    'NZDCAD': 'NZDCAD=X',
+    'NZDJPY': 'NZDJPY=X',
+    'NZDCHF': 'NZDCHF=X',
+    'CADCHF': 'CADCHF=X'
+  };
+  
+  if (currencyMappings[cleanSymbol]) {
+    return currencyMappings[cleanSymbol];
+  }
+  
   // Commodity mappings
   const commodityMappings: Record<string, string> = {
     'GOLD': 'GC=F',
@@ -460,11 +494,12 @@ function calculateRSIData(candles: Candle[]): RSIData[] {
   }));
 }
 
-// Enhanced popular symbols with more asset types
+// Enhanced popular symbols with more asset types including currency pairs
 export const POPULAR_SYMBOLS = {
   US: ['AAPL', 'GOOGL', 'MSFT', 'TSLA', 'AMZN', 'NVDA', 'META', 'MSTR', 'PLTR', 'QUBT', 'SPY', 'QQQ'],
   INDIAN: ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'HINDUNILVR.NS', 'ITC.NS', 'SBIN.NS', 'BHARTIARTL.NS', 'KOTAKBANK.NS', 'LT.NS'],
   CRYPTO: ['BTC-USD', 'ETH-USD', 'ADA-USD', 'SOL-USD', 'DOT-USD', 'LINK-USD', 'MATIC-USD', 'AVAX-USD'],
   COMMODITIES: ['GC=F', 'SI=F', 'CL=F', 'BZ=F', 'HG=F', 'PL=F', 'PA=F', 'NG=F'],
-  INDICES: ['^GSPC', '^IXIC', '^DJI', '^RUT', '^VIX', '^NSEI', '^BSESN', '^HSI', '^N225', '^FTSE', '^GDAXI', '^FCHI']
+  INDICES: ['^GSPC', '^IXIC', '^DJI', '^RUT', '^VIX', '^NSEI', '^BSESN', '^HSI', '^N225', '^FTSE', '^GDAXI', '^FCHI'],
+  CURRENCIES: ['EURUSD=X', 'USDJPY=X', 'GBPUSD=X', 'USDCAD=X', 'AUDUSD=X', 'NZDUSD=X', 'USDCHF=X', 'GBPJPY=X']
 };

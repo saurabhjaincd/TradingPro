@@ -48,7 +48,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
     const lastCandle = candles[candles.length - 1];
     const timeInterval = candles.length > 1 ? candles[1].timestamp - candles[0].timestamp : 3600000; // 1 hour default
 
-    // Add future candles (empty for projection)
+    // Add future candles (empty for projection) - but keep them synchronized with RSI
     for (let i = 1; i <= 100; i++) {
       extended.push({
         timestamp: lastCandle.timestamp + (timeInterval * i),
@@ -110,7 +110,13 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
   const startIndex = Math.max(0, Math.min(extendedCandles.length - maxCandles, extendedCandles.length - maxCandles + panOffset));
   const endIndex = Math.min(extendedCandles.length, startIndex + maxCandles);
   const displayCandles = extendedCandles.slice(startIndex, endIndex);
-  const displayRsi = rsi.slice(Math.max(0, startIndex - (extendedCandles.length - candles.length)), Math.max(0, endIndex - (extendedCandles.length - candles.length)));
+  
+  // Fix RSI synchronization - only show RSI for actual candles, not future ones
+  const actualCandlesCount = candles.length;
+  const historicalCandlesCount = extendedCandles.length - actualCandlesCount - 100; // 100 future candles
+  const rsiStartIndex = Math.max(0, startIndex - historicalCandlesCount);
+  const rsiEndIndex = Math.min(rsi.length, rsiStartIndex + displayCandles.length);
+  const displayRsi = rsi.slice(rsiStartIndex, rsiEndIndex);
 
   useEffect(() => {
     drawCandlestickChart();
@@ -397,7 +403,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
       drawBBLine(bbLower, '#3b82f6', 1);
     }
 
-    // Draw SMA lines
+    // Draw SMA lines with consistent thickness for 50, 100, 200
     if (indicators) {
       const drawSMALine = (values: number[], color: string, lineWidth: number) => {
         const smaValues = values.slice(startIndex, startIndex + displayCandles.length);
@@ -423,8 +429,8 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
 
       drawSMALine(indicators.sma9, '#3b82f6', 1);    // Blue
       drawSMALine(indicators.sma50, '#ef4444', 2);   // Red
-      drawSMALine(indicators.sma100, '#eab308', 3);  // Yellow
-      drawSMALine(indicators.sma200, '#1e40af', 4);  // Dark Blue
+      drawSMALine(indicators.sma100, '#eab308', 2);  // Yellow - same thickness as 50
+      drawSMALine(indicators.sma200, '#1e40af', 2);  // Dark Blue - same thickness as 50
     }
     
     // Draw price labels
@@ -456,7 +462,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
     const candleWidth = Math.max(1, Math.min(8, chartWidth / displayCandles.length * 0.7));
     const candleSpacing = chartWidth / (displayCandles.length - 1);
     
-    // Draw candles
+    // Draw candles with dark green for bullish candles
     displayCandles.forEach((candle, index) => {
       if (candle.volume === 0) return; // Skip future candles
       
@@ -469,7 +475,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
       const lowY = marginTop + ((adjustedLogMax - Math.log(candle.low)) / adjustedLogRange) * chartHeight;
       
       const isGreen = candle.close >= candle.open;
-      const color = isGreen ? '#10b981' : '#ef4444';
+      const color = isGreen ? '#166534' : '#ef4444'; // Dark green for bullish candles
       
       // Draw wick
       ctx.strokeStyle = color;
@@ -743,11 +749,11 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
               <span>SMA50</span>
             </div>
             <div className="flex items-center space-x-1">
-              <div className="w-3 h-0.5 bg-yellow-600 rounded" style={{ height: '3px' }}></div>
+              <div className="w-3 h-0.5 bg-yellow-600 rounded" style={{ height: '2px' }}></div>
               <span>SMA100</span>
             </div>
             <div className="flex items-center space-x-1">
-              <div className="w-3 h-0.5 bg-blue-800 rounded" style={{ height: '4px' }}></div>
+              <div className="w-3 h-0.5 bg-blue-800 rounded" style={{ height: '2px' }}></div>
               <span>SMA200</span>
             </div>
           </div>

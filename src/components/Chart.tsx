@@ -40,27 +40,14 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
   const [extendedCandles, setExtendedCandles] = useState<Candle[]>([]);
   const [indicators, setIndicators] = useState<TechnicalIndicators | null>(null);
 
-  // Generate extended candles for future projection and more historical data
+  // Generate extended candles for historical data only (no future candles)
   useEffect(() => {
     if (candles.length === 0) return;
 
     const extended = [...candles];
-    const lastCandle = candles[candles.length - 1];
     const timeInterval = candles.length > 1 ? candles[1].timestamp - candles[0].timestamp : 3600000; // 1 hour default
 
-    // Add future candles (empty for projection) - but keep them synchronized with RSI
-    for (let i = 1; i <= 100; i++) {
-      extended.push({
-        timestamp: lastCandle.timestamp + (timeInterval * i),
-        open: lastCandle.close,
-        high: lastCandle.close,
-        low: lastCandle.close,
-        close: lastCandle.close,
-        volume: 0
-      });
-    }
-
-    // Generate more historical data (simulated for demo)
+    // Generate more historical data (simulated for demo) - NO FUTURE CANDLES
     const firstCandle = candles[0];
     const historicalCandles: Candle[] = [];
     for (let i = 500; i > 0; i--) {
@@ -111,19 +98,38 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
   const endIndex = Math.min(extendedCandles.length, startIndex + maxCandles);
   const displayCandles = extendedCandles.slice(startIndex, endIndex);
   
-  // Fix RSI synchronization - only show RSI for actual candles, not future ones
+  // Synchronize RSI with displayed candles - match exactly with price chart
   const actualCandlesCount = candles.length;
-  const historicalCandlesCount = extendedCandles.length - actualCandlesCount - 100; // 100 future candles
-  const rsiStartIndex = Math.max(0, startIndex - historicalCandlesCount);
-  const rsiEndIndex = Math.min(rsi.length, rsiStartIndex + displayCandles.length);
-  const displayRsi = rsi.slice(rsiStartIndex, rsiEndIndex);
+  const historicalCandlesCount = extendedCandles.length - actualCandlesCount;
+  
+  // Create synchronized RSI data that matches displayCandles exactly
+  const synchronizedRsi: RSIData[] = [];
+  displayCandles.forEach((candle, index) => {
+    const globalIndex = startIndex + index;
+    
+    if (globalIndex >= historicalCandlesCount && globalIndex < historicalCandlesCount + rsi.length) {
+      // This is a real candle with RSI data
+      const rsiIndex = globalIndex - historicalCandlesCount;
+      synchronizedRsi.push(rsi[rsiIndex]);
+    } else {
+      // This is a historical candle, generate mock RSI
+      const mockRsi = 45 + Math.random() * 10; // Random RSI between 45-55
+      synchronizedRsi.push({
+        timestamp: candle.timestamp,
+        value: mockRsi,
+        ma: mockRsi,
+        upperBB: mockRsi + 10,
+        lowerBB: mockRsi - 10
+      });
+    }
+  });
 
   useEffect(() => {
     drawCandlestickChart();
     if (showRSI) {
       drawRSIChart();
     }
-  }, [displayCandles, displayRsi, showRSI, zoomLevel, panOffset, indicators]);
+  }, [displayCandles, synchronizedRsi, showRSI, zoomLevel, panOffset, indicators]);
 
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
@@ -141,7 +147,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
         setPanOffset(prev => {
           const newOffset = prev - panDelta;
           const maxOffset = Math.max(0, extendedCandles.length - maxCandles);
-          return Math.max(-maxOffset, Math.min(100, newOffset)); // Allow future panning
+          return Math.max(-maxOffset, Math.min(0, newOffset)); // No future panning
         });
         
         setLastMouseX(e.clientX);
@@ -259,7 +265,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
     const dataIndex = Math.floor(((x - marginLeft) / chartWidth) * displayCandles.length);
     if (dataIndex >= 0 && dataIndex < displayCandles.length) {
       const candle = displayCandles[dataIndex];
-      const rsiData = displayRsi[dataIndex];
+      const rsiData = synchronizedRsi[dataIndex];
       
       setTooltip({
         x: e.clientX,
@@ -446,7 +452,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
       ctx.fillText('$' + formatPrice(price), marginLeft - 10, y);
     }
     
-    // Draw time labels
+    // Draw time labels - synchronized with candles
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#6b7280';
@@ -462,10 +468,8 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
     const candleWidth = Math.max(1, Math.min(8, chartWidth / displayCandles.length * 0.7));
     const candleSpacing = chartWidth / (displayCandles.length - 1);
     
-    // Draw candles with dark green for bullish candles
+    // Draw candles with lighter dark green for bullish candles
     displayCandles.forEach((candle, index) => {
-      if (candle.volume === 0) return; // Skip future candles
-      
       const x = marginLeft + index * candleSpacing;
       
       // Calculate Y positions using logarithmic scale
@@ -475,7 +479,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
       const lowY = marginTop + ((adjustedLogMax - Math.log(candle.low)) / adjustedLogRange) * chartHeight;
       
       const isGreen = candle.close >= candle.open;
-      const color = isGreen ? '#166534' : '#ef4444'; // Dark green for bullish candles
+      const color = isGreen ? '#22c55e' : '#ef4444'; // Lighter green (#22c55e) for bullish candles
       
       // Draw wick
       ctx.strokeStyle = color;
@@ -507,7 +511,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
 
   const drawRSIChart = () => {
     const canvas = rsiChartRef.current;
-    if (!canvas || displayRsi.length === 0) return;
+    if (!canvas || synchronizedRsi.length === 0) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -549,19 +553,19 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
     ctx.fillRect(marginLeft, zone60Y, chartWidth, zone40Y - zone60Y);
     
     // Draw Bollinger Bands background
-    const pointSpacing = chartWidth / (displayRsi.length - 1);
+    const pointSpacing = chartWidth / (synchronizedRsi.length - 1);
     
     ctx.beginPath();
-    displayRsi.forEach((point, index) => {
+    synchronizedRsi.forEach((point, index) => {
       const x = marginLeft + index * pointSpacing;
       const y = marginTop + (chartHeight * (rsiMax - Math.min(rsiMax, Math.max(rsiMin, point.upperBB)))) / rsiRange;
       if (index === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     });
     
-    for (let i = displayRsi.length - 1; i >= 0; i--) {
+    for (let i = synchronizedRsi.length - 1; i >= 0; i--) {
       const x = marginLeft + i * pointSpacing;
-      const y = marginTop + (chartHeight * (rsiMax - Math.min(rsiMax, Math.max(rsiMin, displayRsi[i].lowerBB)))) / rsiRange;
+      const y = marginTop + (chartHeight * (rsiMax - Math.min(rsiMax, Math.max(rsiMin, synchronizedRsi[i].lowerBB)))) / rsiRange;
       ctx.lineTo(x, y);
     }
     
@@ -603,6 +607,18 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
       }
     });
     
+    // Draw time labels - synchronized with price chart
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#6b7280';
+    const labelInterval = Math.max(1, Math.floor(synchronizedRsi.length / 6));
+    
+    for (let i = 0; i < synchronizedRsi.length; i += labelInterval) {
+      const x = marginLeft + (chartWidth / (synchronizedRsi.length - 1)) * i;
+      const timeLabel = formatDate(synchronizedRsi[i].timestamp, timeframe);
+      ctx.fillText(timeLabel, x, marginTop + chartHeight + 8);
+    }
+    
     // Draw Bollinger Bands
     ctx.strokeStyle = '#10b981';
     ctx.lineWidth = 1;
@@ -610,7 +626,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
     
     // Upper Bollinger Band
     ctx.beginPath();
-    displayRsi.forEach((point, index) => {
+    synchronizedRsi.forEach((point, index) => {
       const x = marginLeft + index * pointSpacing;
       const y = marginTop + (chartHeight * (rsiMax - Math.min(rsiMax, Math.max(rsiMin, point.upperBB)))) / rsiRange;
       if (index === 0) ctx.moveTo(x, y);
@@ -620,7 +636,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
     
     // Lower Bollinger Band
     ctx.beginPath();
-    displayRsi.forEach((point, index) => {
+    synchronizedRsi.forEach((point, index) => {
       const x = marginLeft + index * pointSpacing;
       const y = marginTop + (chartHeight * (rsiMax - Math.min(rsiMax, Math.max(rsiMin, point.lowerBB)))) / rsiRange;
       if (index === 0) ctx.moveTo(x, y);
@@ -633,7 +649,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     
-    displayRsi.forEach((point, index) => {
+    synchronizedRsi.forEach((point, index) => {
       const x = marginLeft + index * pointSpacing;
       const y = marginTop + (chartHeight * (rsiMax - Math.min(rsiMax, Math.max(rsiMin, point.ma)))) / rsiRange;
       
@@ -651,7 +667,7 @@ export function Chart({ symbol, timeframe, candles, rsi, showRSI = true }: Chart
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     
-    displayRsi.forEach((point, index) => {
+    synchronizedRsi.forEach((point, index) => {
       const x = marginLeft + index * pointSpacing;
       const y = marginTop + (chartHeight * (rsiMax - Math.min(rsiMax, Math.max(rsiMin, point.value)))) / rsiRange;
       
